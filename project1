@@ -1,0 +1,173 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+author: "ES"
+date: "2024-08-01"
+output: html_document
+---
+ 
+
+## Loading and preprocessing the data
+
+Loading packages I'll be using
+```{r message=FALSE}
+library(data.table)
+library(dplyr)
+library(ggplot2)
+```
+
+Load data with fread
+```{r}
+# load data into dt
+dt <- data.table::fread(unzip("activity.zip"),fill=TRUE)
+
+# Observing data
+head(dt)
+str(dt)
+```
+
+
+## What is mean total number of steps taken per day?
+
+```{r}
+steps_per_day <- dt %>%
+    group_by(date) %>%
+    summarize(sum_steps = sum(steps),  .groups = 'drop')
+```
+
+
+```{r histogram1, fig.width=8, fig.height=6}
+with(
+    steps_per_day,
+    hist(
+        sum_steps,
+        xlab = "Total no of steps each day",
+        main = "Histogram of Total Number of steps taken each day",
+        col = "white",
+        border = "black",
+        labels = TRUE
+    )
+)
+```
+
+
+
+```{r}
+steps_per_day %>%
+    filter(complete.cases(.)) %>%
+    summarize(mean = mean(sum_steps), median = median(sum_steps))
+```
+
+
+
+## What is the average daily activity pattern?
+
+
+```{r}
+mean_interval <- dt %>% group_by(interval) %>%
+    na.omit() %>%
+    summarize(avg_step = mean(steps), .groups = 'drop')
+```
+
+```{r timeseries1, fig.width=8, fig.height=6}
+ggplot(mean_interval, aes(interval, avg_step)) +
+    geom_line() +
+    labs(x = "Intervals", y = "Average steps taken") +
+    ggtitle("Time series of Average steps taken during 5 minute interval") +
+    theme_bw()
+```
+
+
+
+```{r}
+mean_interval %>% filter(avg_step == max(avg_step))
+```
+
+
+## Imputing missing values
+
+
+```{r}
+dt %>% summarise_all(~sum(is.na(.)))
+```
+
+
+```{r}
+# create new data table
+complete_dt <- dt
+
+# loop over all rows
+for (i in 1:nrow(complete_dt)) {
+    if(is.na(complete_dt$steps[i])) {
+        # match indexes of new datatable interval with mean_interval
+        index <- which(complete_dt$interval[i] == mean_interval$interval)
+        # assign average step to NA at ith row of step column
+        complete_dt$steps[i] <- mean_interval[index,]$avg_step
+    }
+}
+```
+
+
+
+```{r}
+# perform necessary transformation
+hist_complete_dt <- complete_dt %>%
+    group_by(date) %>%
+    summarize(sum_steps = sum(steps), .groups = 'drop')
+
+```
+```{r histogram2, fig.width=8, fig.height=6}
+# plot histogram
+with(
+    hist_complete_dt,
+    hist(
+        sum_steps,
+        xlab = "Total no of steps each day",
+        main = "Histogram of Total Number of steps taken each day",
+        col = "white",
+        border = "black",
+        labels = TRUE
+    )
+)
+```
+
+
+
+```{r}
+hist_complete_dt %>%
+    summarize(mean = mean(sum_steps), median = median(sum_steps))
+```
+
+
+
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+
+
+```{r}
+library(chron) 
+w_complete_dt <- complete_dt %>%
+    mutate(date = chron::is.weekend(date))
+```
+
+
+
+```{r}
+# transforming data for plotting
+w_timeseries <- w_complete_dt %>% group_by(date, interval) %>%
+    summarize(avg_step = mean(steps), .groups = 'drop')
+
+# changing labels for more appropriate names
+labels <- as_labeller(c(`TRUE` = "Weekend", `FALSE` = "Weekday"))
+
+```
+```{r timeseries2, fig.width=8, fig.height=6}
+# plot time series with ggplot
+ggplot(w_timeseries, aes(interval, avg_step, color=date)) +
+    geom_line() +
+    facet_wrap(~date, nrow=2, labeller= labels)+
+    labs(x = "Intervals", y = "Average steps taken") +
+    ggtitle("Time series of Average steps taken Weekday vs Weekend") +
+    theme_bw()
+```
+
