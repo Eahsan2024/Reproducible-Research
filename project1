@@ -18,8 +18,8 @@ library(ggplot2)
 Load data with fread
 ```{r}
 # load data into dt
-dt <- data.table::fread(unzip("activity.zip"),fill=TRUE)
 
+dt <- data.table::fread("activity.csv", fill=TRUE, header=TRUE)
 # Observing data
 head(dt)
 str(dt)
